@@ -1,0 +1,332 @@
+---
+title: "CS 422 Section 01 hw2"
+output: html_notebook
+author: Rui Zou  A20351034
+---
+
+##2.1 Decision Tree Classification
+###(a)
+```{r}
+setwd("/Users/rzou/Academics/Courses/CS422 - Data Mining/homeworks/hw2")
+
+set.seed(1122)
+
+train_raw = read.csv("adult-train.csv", header=T, sep=",")
+train_raw
+sum(train_raw$occupation=="?")
+which(train_raw$occupation=="?")
+
+dirty_rows_train = integer()
+for (i in 1:ncol(train_raw)){
+    dirty_rows_train <- c(dirty_rows_train, which(train_raw[[i]] == "?"))
+}
+length(unique(dirty_rows_train))
+train = train_raw[-c(dirty_rows_train),]
+train
+```
+
+```{r}
+test_raw = read.csv("adult-test.csv", header=T, sep=",")
+test_raw
+
+dirty_rows_test = integer()
+for (i in 1:ncol(test_raw)){
+    dirty_rows_test <- c(dirty_rows_test, which(test_raw[[i]] == "?"))
+}
+length(unique(dirty_rows_test))
+test = test_raw[-c(dirty_rows_test),]
+test
+```
+###(b)
+```{r}
+library(rpart)
+
+par(family='Arial Unicode MS')
+par(mfrow = c(1,2), xpd = NA)
+tree = rpart(income ~ ., data=train, method="class")
+plot(tree, uniform=TRUE, main="Decision Tree Model for Income")
+text(tree, use.n=TRUE, all=TRUE, cex=.8)
+summary(tree)
+print(tree)
+```
+####(i)
+From the summary, we can see that the top 3 important predictors are in turn "relationship", "marital_status", "capital_gain".
+
+####(ii)
+The first split is done on "relationship". If relationship belongs to one of the following: "Not-in-family", "Other-relative", "Own-child", or "Unmarried", then classify the object as <=50k. The first node is predicted as <=50k. The observation distribution between "<=50k" and ">50k" is 0.751 and 0.249 respectively.
+
+###(c)
+```{r}
+library(caret)
+pred = predict(tree, test, type="class")
+confusionMatrix(pred, test$income)
+
+```
+####(i)
+The balanced accuracy of the model = (0.9482 + 0.5035)/2 = 0.726.
+
+####(ii)
+The balanced error rate of the model = 1 - 0.726 = 0.274.
+
+####(iii)
+The sensitivity = 0.948. The specificity = 0.504.
+
+####(iv)
+```{r}
+library(pROC)
+
+par(family='Arial Unicode MS')
+pred_prob = predict(tree, test, type="prob")
+plot(roc(test$income, pred_prob[,2]), col="yellow", main="ROC Curve")
+auc(test$income, pred_prob[,2])
+
+```
+The AUC is 0.843.
+
+###(d)
+```{r}
+library(rpart)
+
+printcp(tree)
+```
+Above lists cp values and cross-validation error (xerror) for each nsplit and can be used to prune the tree. The one with least cross-validated error (xerror) is the optimal value of CP, and we use it to try to prune the tree. 
+```{r}
+library(caret)
+
+cp = tree$cptable[which.min(tree$cptable[,"xerror"]),"CP"]
+ptree <- prune(tree, cp)
+ppred = predict(ptree, test, type="class")
+confusionMatrix(ppred, test$income)
+
+base_accuracy <- mean(pred == test$income)
+accuracy_postprun <- mean(ppred == test$income)
+data.frame(base_accuracy, accuracy_postprun)
+```
+The results show that the tree after pruning get exact same accuracy with no pruning, i.e. no benefit. This maybe because pruning is used to reduce the chances of overfitting the tree to the training data and reduce the overall complexity of the tree, and our original tree model is generalized enough, not that complex.
+
+###(e)
+####(i)
+```{r}
+cat("In the training dataset,", "\n")
+cat("There are", sum(train$income == '<=50K'), "observations in class '<=50K'.", "\n")
+cat("There are", sum(train$income == '>50K'), "observations in class '>50K'.")
+```
+####(ii)
+```{r}
+majority <- train[which(train$income=='<=50K'), ]
+minority <- train[which(train$income=='>50K'), ]
+smpl <- majority[sample(nrow(majority), size=nrow(minority)), ]
+new_train <- rbind(smpl, minority)
+new_train
+```
+####(iii)
+```{r}
+library(rpart)
+library(caret)
+library(pROC)
+
+tree2 = rpart(income ~ ., data=new_train, method="class")
+
+pred2 = predict(tree2, test, type="class")
+confusionMatrix(pred2, test$income)
+
+par(family='Arial Unicode MS')
+pred_prob2 = predict(tree2, test, type="prob")
+plot(roc(test$income, pred_prob2[,2]), col="green", main="ROC Curve")
+auc(test$income, pred_prob2[,2])
+
+```
+#####(i) 
+The balanced accuracy of new tree is 0.802.
+
+#####(ii) 
+The balanced error rate of new tree is 0.198.
+
+#####(iii) 
+Sensitivity is 0.775. Specificity is 0.830.
+
+#####(iv)
+AUC is 0.845.
+
+###(f)
+Results comparison:
+
+The balance accuracy: (e) > (c). The sensitivity: (c) > (e). The specificity: (e) > (c).
+The AUC: (e) > (c). This shows that after removing the class imbalance impact, we get a better model.
+
+
+
+##2.2 Random Forest
+###(a)
+```{r}
+library(randomForest)
+library(caret)
+set.seed(1122)
+
+rf <- randomForest(income ~ ., data=train, importance=TRUE)
+
+pred3 = predict(rf, test, type="class")
+confusionMatrix(pred3, test$income)
+
+```
+####(i)
+The balanced accuracy of the random forest is 0.632.
+
+####(ii)
+The accuracy of the random forest is 0.818.
+
+####(iii)
+Sensitivity is 0.997. Specificity is 0.267.
+
+####(iv)
+There are (32+989)= 1021 observations labeled ">50K", and (11328+2711)= 14039 observations labeled "<=50K".
+
+####(v)
+Yes, make sense. Sensitivity = 11328/(11328+32) = 0.997. Specificity = 989/(989+2711) = 0.267.
+
+####(vi)
+```{r}
+par(family='Arial Unicode MS')
+varImpPlot(rf, pch=19, col='blue', main='Random Forest')
+```
+For MeanDecreaseAccuracy, "capital_gain" is the most important variable, and "native_country" is the least important one.
+
+For MeanDecreaseGini, "relationship" is the most important variable, and "race" is the least important one.
+
+####(vii)
+```{r}
+print(rf)
+```
+The number of variables tried at each split is 3.
+
+###(b)
+```{r}
+set.seed(1122)
+par(family='Arial Unicode MS')
+
+X <- train[ , -15]
+Y <- train[ , 15] 
+mtry <- tuneRF(X, Y, ntreeTry=500, stepFactor=1.5,improve=0.01, trace=TRUE, plot=TRUE)
+print(mtry)
+
+```
+####(i)
+For classification, the default value of mtry is the square root of the number of predictors in X, sqrt(14) = 3.
+
+####(ii)
+The optimal value of mtry suggested is 2, which has the lowest OOB error.
+
+####(iii)
+```{r}
+set.seed(1122)
+rf2 <- randomForest(income ~ ., data=train, importance=TRUE, mtry=2)
+
+pred4 = predict(rf2, test, type="class")
+confusionMatrix(pred4, test$income)
+```
+#####(1) 
+The balanced accuracy of the model is 0.638.
+
+#####(2) 
+The accuracy of the model is 0.821.
+
+#####(3)
+Sensitivity is 0.997. Specificity is 0.279.
+
+#####(5)
+```{r}
+par(family='Arial Unicode MS')
+varImpPlot(rf2, pch=19, col='blue')
+```
+For MeanDecreaseAccuracy, "capital_gain" is the most important variable, and "native_country" is the least important one.
+
+For MeanDecreaseGini, "capital_gain" is the most important variable, and "race" is the least important one.
+
+####(vi)
+Results comparison:
+
+The balance accuracy: (b) > (a). The sensitivity: (b) ~= (a). The specificity: (b) > (a). variable importance in (b) has more purity on both measurements, while in (a) has different most important ones on both measurements. These comparisons show that after tuning random forest model, we get a better model.
+
+
+
+##2.3 Association Rules
+```{r}
+library(arules)
+tr <- read.transactions("groceries.csv", format = "basket", sep=",")
+```
+
+###(i)
+```{r}
+rules <- apriori(tr)
+summary(rules)
+```
+Using default minsup = 0.1, we get 0 rules.
+
+###(ii)
+```{r}
+rules <- apriori(tr, parameter = list(supp=0.001, target='rules'))
+summary(rules)
+```
+At support value = 0.001, we get at least 400 rules.
+
+###(iii)
+```{r}
+itemfreq <- data.frame(itemFrequency(tr, type='absolute'))
+
+mostitem <- rownames(itemfreq)[apply(itemfreq, 2, which.max)]
+mostitem
+itemfreq[mostitem, ]
+
+```
+The most frequently bought item is "whole milk". Its frequency is 2513.
+
+###(iv)
+```{r}
+leastitem <- rownames(itemfreq)[apply(itemfreq, 2, which.min)]
+leastitem
+itemfreq[leastitem, ]
+```
+The least frequently bought item is "baby food". Its frequency is 1.
+
+###(v)
+Here are top 5 rules sorted by support.
+```{r}
+top_supp <- sort(rules, decreasing = TRUE, na.last = NA, by = "support")
+inspect(head(top_supp, 5))
+```
+
+###(vi)
+Here are top 5 rules sorted by confidence.
+```{r}
+top_conf <- sort(rules, decreasing = TRUE, na.last = NA, by = "confidence")
+inspect(head(top_conf, 5))
+```
+
+###(vii)
+Here are bottom 5 rules sorted by support.
+```{r}
+bot_supp <- sort(rules, decreasing = FALSE, na.last = NA, by = "support")
+inspect(head(bot_supp, 5))
+```
+
+###(viii)
+Here are bottom 5 rules sorted by confidence.
+```{r}
+bot_conf <- sort(rules, decreasing = FALSE, na.last = NA, by = "confidence")
+inspect(head(bot_conf, 5))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
