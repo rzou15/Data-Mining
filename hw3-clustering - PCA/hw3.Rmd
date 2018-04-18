@@ -1,0 +1,314 @@
+---
+title: "CS 422 Section-01 hw3"
+author: "Rui Zou  A20351034"
+output:
+  html_document:
+    df_print: paged
+---
+
+##2.1 K-means Clustering
+###(a) Data cleanup
+####(i) 
+The "Name" attribute should be removed before clustering, because it is a nominal attribute, unique for each data object, thus no help for clustering.
+
+####(ii) 
+Yes. Standardization can help avoid letting an attribute with large values dominate the results of the calculation, it is usually necessary in data preprocessing.
+
+####(iii)
+Clean the data to remove multiple spaces and make the comma character the delimiter.
+```{r}
+library(cluster)
+library(ggplot2)
+library(factoextra)
+
+setwd("/Users/rzou/Academics/Courses/CS422 - Data Mining/homeworks/hw3")
+set.seed(20)
+
+mammals = read.csv("file19.txt", row.names = 1, sep="")
+mammals
+```
+###(b) Clustering
+####(i)
+```{r}
+# data standardization
+mammals <- scale(mammals)
+# determine optimal k
+fviz_nbclust(mammals, kmeans, method = "silhouette")
+
+```
+So 8 clusters would be optimal.
+
+####(ii)
+```{r}
+# K-means clustering
+k <- 8
+km.res <- kmeans(mammals, k, nstart = 10)  # run 10 times of different initials and pick the best result
+
+# Visualize kmeans clustering
+fviz_cluster(km.res, mammals, repel = TRUE, ellipse.type = "norm")   # use repel = TRUE to avoid overplotting
+```
+####(iii)
+```{r}
+km.res
+```
+K-means clustering with 8 clusters of sizes 9, 17, 9, 1, 15, 4, 8, 3.
+
+####(iv)
+```{r}
+km.res$tot.withinss
+```
+total SSE = 55.23812
+
+####(v)
+```{r}
+km.res$withinss
+```
+Within cluster sum of squares by cluster:
+13.174224  9.591579  6.337449  0.000000 11.117050  6.226867  4.244696  4.546254
+
+####(vi)
+```{r}
+for (i in 1:8){
+  print(paste("Cluster", i))
+  animals = which(km.res$cluster==i)
+  print(animals)
+}
+```
+Basically it basically makes sense.
+
+##2.2 Hierarchical clustering
+```{r}
+df = read.csv("file46.txt", row.names = 1, sep="")
+df
+```
+###(a)
+```{r}
+singlelink <- eclust(df, "hclust", hc_method = "single")
+fviz_dend(singlelink)
+```
+```{r}
+completelink <- eclust(df, "hclust", hc_method = "complete")
+fviz_dend(completelink)
+```
+```{r}
+averagelink <- eclust(df, "hclust", hc_method = "average")
+fviz_dend(averagelink)
+```
+###(b)
+For single link:
+  {Great Britain, Ireland}, {West Germany, Austria}, {Luxemburg, Switzerland}, {France, Belgium}, {Denmark, Norway}
+
+For complete link:
+  {West Germany, Austria}, {Luxemburg, Switzerland}, {Denmark, Norway}, {Great Britain, Ireland}, {France, Belgium}
+
+For average link:
+  {Portugal, Spain}, {West Germany, Austria}, {Luxemburg, Switzerland}, {France, Belgium}, {Denmark, Norway}, {Great Britain, Ireland}
+
+###(c)
+Average link. Raw data show that Italian is not much frequently used in other countries than other popular languages, which indicates that it can be seen as a relative "outliers" to some extent. Because single link is sensitive to outliers and complete link is insensitive, average link then may be a better reflection of clustering.
+
+###(d)
+Average link. In (b) in average link strategy, there are 6 two-singleton clusters, more than those in other two strategies.
+
+###(e)
+There are 6 clusters at height 125. They are {Switzerlands}, {Portugal}, {Spain}, {Finland}, {Italy}, and {all others}.
+
+###(f)
+```{r}
+singlelink2 <- eclust(df, "hclust", k=6, hc_method = "single")
+fviz_dend(singlelink2)
+```
+```{r}
+completelink2 <- eclust(df, "hclust", k=6, hc_method = "complete")
+fviz_dend(completelink2)
+```
+
+```{r}
+averagelink2 <- eclust(df, "hclust", k=6, hc_method = "average")
+fviz_dend(averagelink2)
+```
+###(g)
+For single link:
+```{r}
+# Compute pairwise-distance matrices
+dd <- dist(df, method ="euclidean")
+# Statistics for singlelink clustering
+single_stats <- fpc::cluster.stats(d=dd, clustering=singlelink2$cluster)
+single_stats$clus.avg.silwidths
+single_stats$dunn
+```
+For complete link:
+```{r}
+# Statistics for completelink clustering
+complete_stats <- fpc::cluster.stats(d=dd, clustering=completelink2$cluster)
+complete_stats$clus.avg.silwidths
+complete_stats$dunn
+```
+For average link:
+```{r}
+# Statistics for averagelink clustering
+average_stats <- fpc::cluster.stats(d=dd, clustering=averagelink2$cluster)
+average_stats$clus.avg.silwidths
+average_stats$dunn
+```
+###(h)
+Based on Dunn index, average link is best.
+
+###(i)
+Based on Silhouette width, complete link is best.
+
+
+
+
+##2.3 K-Means and PCA
+```{r}
+htru = read.csv("HTRU_2-small.csv", sep=",")
+head(htru)
+```
+###(a)
+####(i)
+```{r}
+htru.pca <- prcomp(htru[1:8], center = TRUE, scale. = TRUE)
+summary(htru.pca)
+```
+The cumulative variance by the first two components is 0.7855.
+
+####(ii)
+```{r}
+library(ggfortify)
+autoplot(htru.pca, data = htru, colour = 'class')
+```
+####(iii)
+We can see from the graph that the distribution of class 0 is much more than class 1, which is consistent with the original dataset.
+
+###(b)
+####(i)
+```{r}
+htru.km <- kmeans(htru, 2)
+fviz_cluster(htru.km, htru, repel = TRUE, ellipse.type = "norm")   # use repel = TRUE to avoid overplotting
+```
+####(ii)
+Graph (b)(i) and Graph (a)(ii) are similar because k-means will converge to the local optimal solution, whehn k=2, it is essentially equivalent to the first two principle components.
+
+####(iii)
+```{r}
+htru.km
+```
+K-means clustering with 2 clusters of sizes 1486, 8514.
+
+####(iv)
+```{r}
+sum(htru$class == 0)
+sum(htru$class == 1)
+```
+The distribution of the classes in the HTRU2 dataset is: 9041 for class 0, and 959 for class 1.
+
+####(v)
+As the summary in (b)(iii) shows, Cluster 2 corresponds to majority class, Cluster 1 corresponds to minority class.
+
+####(vi)
+```{r}
+obs = which(htru.km$cluster == 2)
+count <- 0
+for (i in 1:length(obs)) {
+  if (htru[obs[i], 9] == 0)
+    count = count + 1
+}
+count
+length(obs) - count
+```
+There are 7570 observations in this large cluster belong to class 0, and 944 observations belong to class 1.
+
+####(vii)
+The larger cluster represents class 0.
+
+####(viii)
+
+####(ix)
+```{r}
+dd <- dist(htru, method ="euclidean")
+htru.km_stats <- fpc::cluster.stats(d=dd, clustering=htru.km$cluster)
+htru.km_stats$clus.avg.silwidths
+```
+
+####(x)
+The cluster which has larger Silhouette width is better.
+
+###(c)
+####(i)
+```{r}
+pca.km <- kmeans(htru.pca$x[, 1:2], 2)
+fviz_cluster(pca.km, htru.pca$x[, 1:2], repel = TRUE, ellipse.type = "norm")
+```
+
+The graph is similar and consistent with Graph (b)(i) and Graph (a)(ii).
+
+####(ii)
+```{r}
+pca.km
+```
+
+```{r}
+dd <- dist(htru, method ="euclidean")
+pca.km_stats <- fpc::cluster.stats(d=dd, clustering=pca.km$cluster)
+pca.km_stats$clus.avg.silwidths
+```
+The average Silhouette width of both the clusters are 
+
+####(iii)
+The cluster which has larger Silhouette width is better.
+
+####(iv)
+They are correlated, larger in c(ii) consistent with larger in b(ix).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
