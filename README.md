@@ -1,2 +1,2 @@
 # Data-Mining
-CS 422
+This is Data Mining project.
