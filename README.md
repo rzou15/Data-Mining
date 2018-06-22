@@ -1,2 +1,2 @@
 # Data-Mining
-This is Data Mining project for CS 422.
+This is Data Mining project for CS 422
